@@ -1,28 +1,45 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.db.database import init_db
+from app.api.orders import router as orders_router
+from app.config import get_settings
+from app.db.database import SessionLocal, init_db
+from app.services.relay import process_due_orders
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("order-relay")
+
+settings = get_settings()
+
+
+async def dispatch_pending_orders() -> None:
+    while True:
+        try:
+            with SessionLocal() as db:
+                await process_due_orders(db)
+        except Exception:
+            logger.exception("Unexpected error while processing orders.")
+
+        await asyncio.sleep(settings.dispatch_interval_seconds)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
 
-    # TODO:
-    # Start any background processing mechanism you need.
-    #
-    # You may use FastAPI BackgroundTasks, an asyncio worker, or another
-    # simple mechanism, but orders must be persisted before being forwarded
-    # and must remain recoverable after a service restart.
+    dispatcher_task = asyncio.create_task(dispatch_pending_orders())
 
     yield
 
-    # TODO: Stop your background worker cleanly if needed.
+    dispatcher_task.cancel()
+
+    try:
+        await dispatcher_task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(
@@ -31,10 +48,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-
-# TODO:
-# Create your own router(s), for example in `app/api/orders.py`, then include
-# them here. The required endpoints are described in the README.
+app.include_router(orders_router)
 
 
 @app.get("/health")

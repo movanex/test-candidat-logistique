@@ -1,7 +1,7 @@
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
 
@@ -22,6 +22,10 @@ SessionLocal = sessionmaker(
 )
 
 
+class Base(DeclarativeBase):
+    pass
+
+
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
@@ -31,12 +35,7 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
-    """Create database tables.
-
-    You must import your SQLAlchemy models before calling this
-    function so that `Base.metadata.create_all()` can create them.
-    """
-
-    from app.db.models import Base
+    """Create database tables."""
+    from app.db import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

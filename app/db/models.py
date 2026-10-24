@@ -1,24 +1,67 @@
-"""
-TODO: Create the SQLAlchemy model(s) required by the Order Relay Service.
+import uuid
+from datetime import datetime
 
-Requirements:
-- Store the external order ID and prevent duplicate external orders.
-- Store the original order payload.
-- Track the processing status.
-- Track delivery attempts.
-- Store the last error.
-- Store the Warehouse response/reference when available.
-- Store creation and update timestamps.
-- Support retry scheduling.
+from sqlalchemy import JSON, DateTime, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
-Do not modify `app/db/database.py`.
-"""
-
-from sqlalchemy.orm import DeclarativeBase
+from app.db.database import Base
 
 
-class Base(DeclarativeBase):
-    pass
+def generate_uuid() -> str:
+    return str(uuid.uuid4())
 
 
-# TODO: Define your Order model here.
+class Order(Base):
+    __tablename__ = "orders"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=generate_uuid,
+    )
+
+    order_id: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+
+    customer_id: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="PENDING",
+        index=True,
+    )
+
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    next_retry_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+        index=True,
+    )
+
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    warehouse_reference: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
