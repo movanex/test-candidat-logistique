@@ -66,6 +66,21 @@ def get_order(
 
     return OrderDetailResponse.model_validate(order)
 
+@router.get("/failed", response_model=list[OrderDetailResponse])
+def list_failed_orders(
+    db: Session = Depends(get_db),
+) -> list[OrderDetailResponse]:
+    orders = (
+        db.query(Order)
+        .filter(Order.status == "FAILED")
+        .order_by(Order.updated_at.desc())
+        .all()
+    )
+
+    return [
+        OrderDetailResponse.model_validate(order)
+        for order in orders
+    ]
 
 @router.get("", response_model=list[OrderDetailResponse])
 def list_orders(
